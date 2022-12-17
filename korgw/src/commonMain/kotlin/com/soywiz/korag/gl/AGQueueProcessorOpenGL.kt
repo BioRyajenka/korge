@@ -3,6 +3,9 @@ package com.soywiz.korag.gl
 import com.soywiz.kds.fastCastTo
 import com.soywiz.kds.iterators.fastForEach
 import com.soywiz.kgl.KmlGl
+import com.soywiz.kgl.KmlGl.Companion.TEXTURE_2D
+import com.soywiz.kgl.KmlGl.Companion.TEXTURE_BASE_LEVEL
+import com.soywiz.kgl.KmlGl.Companion.TEXTURE_MAX_LEVEL
 import com.soywiz.kgl.deleteBuffer
 import com.soywiz.kgl.deleteFramebuffer
 import com.soywiz.kgl.deleteRenderbuffer
@@ -464,7 +467,7 @@ class AGQueueProcessorOpenGL(
                         //if (doPrint) println("BIND TEXTURE: $textureUnit, tex=${tex.texId}, glId=${texture?.glId}")
                         //println("BIND TEXTURE: $textureUnit, tex=${tex.texId}, implForcedTexId=${tex.implForcedTexId}")
                     } else {
-                        gl.bindTexture(KmlGl.TEXTURE_2D, 0)
+                        gl.bindTexture(TEXTURE_2D, 0)
                         //println("NULL TEXTURE")
                         //if (doPrint) println("NULL TEXTURE")
                     }
@@ -691,7 +694,7 @@ class AGQueueProcessorOpenGL(
         //textureBindEnsuring(tex)
         textureBind(textureId, AG.TextureTargetKind.TEXTURE_2D, -1)
         //println("BIND:" + gl.getError())
-        gl.copyTexImage2D(KmlGl.TEXTURE_2D, 0, KmlGl.RGBA, x, y, width, height, 0)
+        gl.copyTexImage2D(TEXTURE_2D, 0, KmlGl.RGBA, x, y, width, height, 0)
 
         //val data = FBuffer.alloc(800 * 800 * 4)
         //for (n in 0 until 800 * 800) data.setInt(n, Colors.RED.value)
@@ -728,7 +731,7 @@ class AGQueueProcessorOpenGL(
     }
 
     override fun textureBindEnsuring(tex: AG.Texture?) {
-        if (tex == null) return gl.bindTexture(KmlGl.TEXTURE_2D, 0)
+        if (tex == null) return gl.bindTexture(TEXTURE_2D, 0)
 
         // Context lost
         if (tex.cachedVersion != contextVersion) {
@@ -775,10 +778,30 @@ class AGQueueProcessorOpenGL(
                 tex.mipmaps = tex.doMipmaps(source, requestMipmaps)
                 if (bmps != null) {
                     for ((index, rbmp) in bmps.withIndex()) {
-                        _textureUpdate(tex.texId, tex.implForcedTexTarget, index, rbmp, tex.source, tex.mipmaps, tex.premultiplied)
+                        _textureUpdate(
+                            tex.texId,
+                            tex.implForcedTexTarget,
+                            index,
+                            rbmp,
+                            tex.source,
+                            tex.mipmaps,
+                            tex.baseMipmapLevel,
+                            tex.maxMipmapLevel,
+                            tex.premultiplied,
+                        )
                     }
                 } else {
-                    _textureUpdate(tex.texId, tex.implForcedTexTarget, 0, null, tex.source, tex.mipmaps, tex.premultiplied)
+                    _textureUpdate(
+                        tex.texId,
+                        tex.implForcedTexTarget,
+                        0,
+                        null,
+                        tex.source,
+                        tex.mipmaps,
+                        tex.baseMipmapLevel,
+                        tex.maxMipmapLevel,
+                        tex.premultiplied
+                    )
                 }
             } finally {
                 tex.tempBitmaps = null
@@ -795,12 +818,32 @@ class AGQueueProcessorOpenGL(
         gl.bindTexture(gl.TEXTURE_2D, 0)
     }
 
-    override fun textureUpdate(textureId: Int, target: AG.TextureTargetKind, index: Int, bmp: Bitmap?, source: AG.BitmapSourceBase, doMipmaps: Boolean, premultiplied: Boolean) {
+    override fun textureUpdate(
+        textureId: Int,
+        target: AG.TextureTargetKind,
+        index: Int,
+        bmp: Bitmap?,
+        source: AG.BitmapSourceBase,
+        doMipmaps: Boolean,
+        baseMipmapLevel: Int,
+        maxMipmapLevel: Int,
+        premultiplied: Boolean,
+    ) {
         //textureBind(textureId, target, -1)
-        _textureUpdate(textureId, target, index, bmp, source, doMipmaps, premultiplied)
+        _textureUpdate(textureId, target, index, bmp, source, doMipmaps, baseMipmapLevel, maxMipmapLevel, premultiplied)
     }
 
-    fun _textureUpdate(textureId: Int, target: AG.TextureTargetKind, index: Int, bmp: Bitmap?, source: AG.BitmapSourceBase, doMipmaps: Boolean, premultiplied: Boolean) {
+    fun _textureUpdate(
+        textureId: Int,
+        target: AG.TextureTargetKind,
+        index: Int,
+        bmp: Bitmap?,
+        source: AG.BitmapSourceBase,
+        doMipmaps: Boolean,
+        baseMipmapLevel: Int,
+        maxMipmapLevel: Int,
+        premultiplied: Boolean,
+    ) {
         val bytesPerPixel = if (source.rgba) 4 else 1
 
         val isFloat = bmp is FloatBitmap32
@@ -850,6 +893,8 @@ class AGQueueProcessorOpenGL(
         }
 
         if (doMipmaps) {
+            gl.texParameteri(TEXTURE_2D, TEXTURE_BASE_LEVEL, baseMipmapLevel)
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MAX_LEVEL, maxMipmapLevel)
             gl.generateMipmap(texTarget)
         }
     }
@@ -944,10 +989,10 @@ class AGQueueProcessorOpenGL(
             val doMsaa = false
             val texTarget = when {
                 doMsaa -> KmlGl.TEXTURE_2D_MULTISAMPLE
-                else -> KmlGl.TEXTURE_2D
+                else -> TEXTURE_2D
             }
 
-            gl.bindTexture(KmlGl.TEXTURE_2D, fb.texColor)
+            gl.bindTexture(TEXTURE_2D, fb.texColor)
             gl.texParameteri(texTarget, KmlGl.TEXTURE_MAG_FILTER, KmlGl.LINEAR)
             gl.texParameteri(texTarget, KmlGl.TEXTURE_MIN_FILTER, KmlGl.LINEAR)
             if (doMsaa) {
@@ -979,7 +1024,7 @@ class AGQueueProcessorOpenGL(
     override fun frameBufferUse(id: Int) {
         val fb = frameBuffers.getOrCreate(id)
         gl.bindFramebuffer(KmlGl.FRAMEBUFFER, fb.framebuffer)
-        gl.framebufferTexture2D(KmlGl.FRAMEBUFFER, KmlGl.COLOR_ATTACHMENT0, KmlGl.TEXTURE_2D, fb.texColor, 0)
+        gl.framebufferTexture2D(KmlGl.FRAMEBUFFER, KmlGl.COLOR_ATTACHMENT0, TEXTURE_2D, fb.texColor, 0)
         val internalFormat = when {
             fb.hasStencilAndDepth -> KmlGl.DEPTH_STENCIL_ATTACHMENT
             fb.hasStencil -> KmlGl.STENCIL_ATTACHMENT

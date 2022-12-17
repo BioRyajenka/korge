@@ -74,6 +74,8 @@ interface AGQueueProcessor {
         bmp: Bitmap?,
         source: AG.BitmapSourceBase,
         doMipmaps: Boolean,
+        baseMipmapLevel: Int,
+        maxMipmapLevel: Int,
         premultiplied: Boolean
     )
     fun textureBind(textureId: Int, target: AG.TextureTargetKind, implForcedTexId: Int)

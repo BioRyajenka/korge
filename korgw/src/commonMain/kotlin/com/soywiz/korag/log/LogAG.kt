@@ -418,9 +418,11 @@ open class LogBaseAG(
             bmp: Bitmap?,
             source: BitmapSourceBase,
             doMipmaps: Boolean,
+            baseMipmapLevel: Int,
+            maxMipmapLevel: Int,
             premultiplied: Boolean
         ) {
-            log("textureUpdate: $textureId, $target, $index, $bmp, $source, $doMipmaps, $premultiplied", Kind.TEXTURE_UPLOAD)
+            log("textureUpdate: $textureId, $target, $index, $bmp, $source, $doMipmaps, $baseMipmapLevel, $maxMipmapLevel, $premultiplied", Kind.TEXTURE_UPLOAD)
         }
 
         override fun textureBind(textureId: Int, target: TextureTargetKind, implForcedTexId: Int) = log("textureBind: $textureId", Kind.TEXTURE)

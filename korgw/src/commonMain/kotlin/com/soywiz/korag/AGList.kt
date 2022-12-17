@@ -14,18 +14,7 @@ import com.soywiz.kds.IntSet
 import com.soywiz.kds.Pool
 import com.soywiz.kds.fastCastTo
 import com.soywiz.kds.lock.NonRecursiveLock
-import com.soywiz.kmem.FBuffer
-import com.soywiz.kmem.extract
-import com.soywiz.kmem.extract16
-import com.soywiz.kmem.extract24
-import com.soywiz.kmem.extract4
-import com.soywiz.kmem.extract8
-import com.soywiz.kmem.extractBool
-import com.soywiz.kmem.finsert
-import com.soywiz.kmem.finsert16
-import com.soywiz.kmem.finsert24
-import com.soywiz.kmem.finsert4
-import com.soywiz.kmem.finsert8
+import com.soywiz.kmem.*
 import com.soywiz.korag.annotation.KoragExperimental
 import com.soywiz.korag.shader.Program
 import com.soywiz.korag.shader.ProgramConfig
@@ -355,12 +344,14 @@ class AGList(val globalState: AGGlobalState) {
                 CMD_TEXTURE_BIND_ENSURING -> processor.textureBindEnsuring(readExtra())
                 CMD_TEXTURE_UPDATE -> processor.textureUpdate(
                     textureId = data.extract16(0),
-                    target = AG.TextureTargetKind.VALUES[data.extract4(16)],
+                    target = AG.TextureTargetKind.VALUES[data.extract2(16)],
                     index = readInt(),
                     bmp = readExtra(),
                     source = readExtra(),
-                    doMipmaps = data.extract(20),
-                    premultiplied = data.extract(21)
+                    doMipmaps = data.extract(18),
+                    baseMipmapLevel = data.extract6(19),
+                    maxMipmapLevel = data.extract6(25),
+                    premultiplied = data.extract(31)
                 )
                 // FRAMEBUFFERS
                 CMD_FRAMEBUFFER_CREATE -> processor.frameBufferCreate(data.extract16(0))
@@ -540,13 +531,25 @@ class AGList(val globalState: AGGlobalState) {
         data: Any?,
         source: AG.BitmapSourceBase,
         doMipmaps: Boolean,
+        baseMipmapLevel: Int,
+        maxMipmapLevel: Int,
         premultiplied: Boolean
     ) {
         currentWrite.addExtra(data, source)
         currentWrite.addInt(index)
+
+        // max is 1000 (10 bytes) but its too much to be encoded to int, so 64 is new max
+        require(baseMipmapLevel in 0 until 64)
+        require(maxMipmapLevel in 0 until 64)
+
         currentWrite.add(
-            CMD(CMD_TEXTURE_UPDATE).finsert16(textureId, 0).finsert4(target.ordinal, 16).finsert(doMipmaps, 20)
-                .finsert(premultiplied, 21)
+            CMD(CMD_TEXTURE_UPDATE)
+                .finsert16(textureId, 0)
+                .finsert2(target.ordinal, 16)
+                .finsert(doMipmaps, 18)
+                .finsert6(baseMipmapLevel, 19)
+                .finsert6(maxMipmapLevel, 25)
+                .finsert(premultiplied, 31)
         )
     }
 
